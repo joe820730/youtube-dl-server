@@ -8,21 +8,22 @@ from starlette.templating import Jinja2Templates
 from starlette.background import BackgroundTask
 
 import uvicorn
-from youtube_dl import YoutubeDL
+from yt_dlp import YoutubeDL
 from collections import ChainMap
 
 templates = Jinja2Templates(directory="")
+YDLS_OUTPUT_DIR = "/mnt/multimedia_nfs/youtube-dl/"
 
 app_defaults = {
     "YDL_FORMAT": "bestvideo+bestaudio/best",
     "YDL_EXTRACT_AUDIO_FORMAT": None,
     "YDL_EXTRACT_AUDIO_QUALITY": "192",
     "YDL_RECODE_VIDEO_FORMAT": None,
-    "YDL_OUTPUT_TEMPLATE": "/youtube-dl/%(title).200s [%(id)s].%(ext)s",
+    "YDL_OUTPUT_TEMPLATE": "%(title).200s [%(id)s].%(ext)s",
     "YDL_ARCHIVE_FILE": None,
     "YDL_SERVER_HOST": "0.0.0.0",
     "YDL_SERVER_PORT": 8080,
-    "YDL_UPDATE_TIME": "True",
+    "YDL_UPDATE_TIME": "False",
 }
 
 
@@ -57,7 +58,7 @@ async def update_route(scope, receive, send):
 def update():
     try:
         output = subprocess.check_output(
-            [sys.executable, "-m", "pip", "install", "--upgrade", "youtube-dl"]
+            [sys.executable, "-m", "pip", "install", "--upgrade", "yt_dlp"]
         )
 
         print(output.decode("ascii"))
@@ -69,16 +70,24 @@ def get_ydl_options(request_options):
         "YDL_EXTRACT_AUDIO_FORMAT": None,
         "YDL_RECODE_VIDEO_FORMAT": None,
     }
-
+    output_path = YDLS_OUTPUT_DIR
     requested_format = request_options.get("format", "bestvideo")
 
     if requested_format in ["aac", "flac", "mp3", "m4a", "opus", "vorbis", "wav"]:
         request_vars["YDL_EXTRACT_AUDIO_FORMAT"] = requested_format
+        output_path += "audio/"
     elif requested_format == "bestaudio":
         request_vars["YDL_EXTRACT_AUDIO_FORMAT"] = "best"
+        output_path += "audio/"
     elif requested_format in ["mp4", "flv", "webm", "ogg", "mkv", "avi"]:
         request_vars["YDL_RECODE_VIDEO_FORMAT"] = requested_format
 
+    if not (os.path.exists(output_path)):
+        try:
+            os.mkdir(output_path)
+        except OSError as error:
+            print(error)
+            output_path = YDLS_OUTPUT_DIR
     ydl_vars = ChainMap(request_vars, os.environ, app_defaults)
 
     postprocessors = []
@@ -103,7 +112,7 @@ def get_ydl_options(request_options):
     return {
         "format": ydl_vars["YDL_FORMAT"],
         "postprocessors": postprocessors,
-        "outtmpl": ydl_vars["YDL_OUTPUT_TEMPLATE"],
+        "outtmpl": output_path + ydl_vars["YDL_OUTPUT_TEMPLATE"],
         "download_archive": ydl_vars["YDL_ARCHIVE_FILE"],
         "updatetime": ydl_vars["YDL_UPDATE_TIME"] == "True",
     }
@@ -123,7 +132,7 @@ routes = [
 
 app = Starlette(debug=True, routes=routes)
 
-print("Updating youtube-dl to the newest version")
+print("Updating yt_dlp to the newest version")
 update()
 
 app_vars = ChainMap(os.environ, app_defaults)
