@@ -1,10 +1,11 @@
 [![Docker Stars Shield](https://img.shields.io/docker/stars/kmb32123/youtube-dl-server.svg?style=flat-square)](https://hub.docker.com/r/kmb32123/youtube-dl-server/)
 [![Docker Pulls Shield](https://img.shields.io/docker/pulls/kmb32123/youtube-dl-server.svg?style=flat-square)](https://hub.docker.com/r/kmb32123/youtube-dl-server/)
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](https://raw.githubusercontent.com/manbearwiz/youtube-dl-server/master/LICENSE)
+![Workflow](https://github.com/manbearwiz/youtube-dl-server/actions/workflows/docker-image.yml/badge.svg)
 
 # youtube-dl-server
 
-Very spartan Web and REST interface for downloading youtube videos onto a server. [`starlette`](https://github.com/encode/starlette) + [`youtube-dl`](https://github.com/rg3/youtube-dl).
+Very spartan Web and REST interface for downloading youtube videos onto a server. [`starlette`](https://github.com/encode/starlette) + [`yt-dlp`](https://github.com/yt-dlp/yt-dlp).
 
 ![screenshot][1]
 
@@ -36,7 +37,7 @@ This is an example service definition that could be put in `docker-compose.yml`.
 If you have python ^3.6.0 installed in your PATH you can simply run like this, providing optional environment variable overrides inline.
 
 ```shell
-YDL_SERVER_PORT=8123 YDL_UPDATE_TIME=False python3 -u ./youtube-dl-server.py
+YDL_UPDATE_TIME=False python3 -m uvicorn youtube-dl-server:app --port 8123
 ```
 
 In this example, `YDL_UPDATE_TIME=False` is the same as the command line option `--no-mtime`.
