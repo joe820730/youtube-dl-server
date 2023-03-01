@@ -1,5 +1,6 @@
 import sys
 import subprocess
+import os
 
 from starlette.status import HTTP_303_SEE_OTHER
 from starlette.applications import Starlette
@@ -14,15 +15,16 @@ from yt_dlp import YoutubeDL, version
 
 templates = Jinja2Templates(directory="templates")
 config = Config(".env")
+YDLS_OUTPUT_DIR = "/mnt/multimedia_nfs/youtube-dl/"
 
 app_defaults = {
     "YDL_FORMAT": config("YDL_FORMAT", cast=str, default="bestvideo+bestaudio/best"),
     "YDL_EXTRACT_AUDIO_FORMAT": config("YDL_EXTRACT_AUDIO_FORMAT", default=None),
     "YDL_EXTRACT_AUDIO_QUALITY": config("YDL_EXTRACT_AUDIO_QUALITY", cast=str, default="192"),
     "YDL_RECODE_VIDEO_FORMAT": config("YDL_RECODE_VIDEO_FORMAT", default=None),
-    "YDL_OUTPUT_TEMPLATE": config("YDL_OUTPUT_TEMPLATE", cast=str, default="/mnt/multimedia_nfs/youtube-dl//%(title).200s [%(id)s].%(ext)s"),
+    "YDL_OUTPUT_TEMPLATE": config("YDL_OUTPUT_TEMPLATE", cast=str, default="%(title).200s [%(id)s].%(ext)s"),
     "YDL_ARCHIVE_FILE": config("YDL_ARCHIVE_FILE", default=None),
-    "YDL_UPDATE_TIME": config("YDL_UPDATE_TIME", cast=bool, default=True),
+    "YDL_UPDATE_TIME": config("YDL_UPDATE_TIME", cast=bool, default=False),
 }
 
 
@@ -81,16 +83,27 @@ def get_ydl_options(request_options):
         "YDL_RECODE_VIDEO_FORMAT": None,
     }
 
+    output_path = YDLS_OUTPUT_DIR
     requested_format = request_options.get("format", "bestvideo")
 
     if requested_format in ["aac", "flac", "mp3", "m4a", "opus", "vorbis", "wav"]:
         request_vars["YDL_EXTRACT_AUDIO_FORMAT"] = requested_format
+        output_path += "audio/"
     elif requested_format == "bestaudio":
         request_vars["YDL_EXTRACT_AUDIO_FORMAT"] = "best"
+        output_path += "audio/"
     elif requested_format in ["mp4", "flv", "webm", "ogg", "mkv", "avi"]:
         request_vars["YDL_RECODE_VIDEO_FORMAT"] = requested_format
 
-    ydl_vars = app_defaults | request_vars
+    if not (os.path.exists(output_path)):
+        try:
+            os.mkdir(output_path)
+        except OSError as error:
+            print(error)
+            output_path = YDLS_OUTPUT_DIR
+
+    ydl_vars = app_defaults.copy()
+    ydl_vars.update(request_vars)
 
     postprocessors = []
 
@@ -114,7 +127,7 @@ def get_ydl_options(request_options):
     return {
         "format": ydl_vars["YDL_FORMAT"],
         "postprocessors": postprocessors,
-        "outtmpl": ydl_vars["YDL_OUTPUT_TEMPLATE"],
+        "outtmpl": output_path + ydl_vars["YDL_OUTPUT_TEMPLATE"],
         "download_archive": ydl_vars["YDL_ARCHIVE_FILE"],
         "updatetime": ydl_vars["YDL_UPDATE_TIME"] == "True",
     }
